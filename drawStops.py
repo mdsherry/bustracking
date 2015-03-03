@@ -2,7 +2,9 @@
 from datetime import datetime, timedelta
 import argparse
 from collections import defaultdict
-
+import sqlite3
+conn = sqlite3.connect('busdata.db')
+c = conn.cursor()
 
 def minuteToTimestamp(t):
 	return "{0:02d}:{1:02d}:00".format( 5 + (t/60), t % 60)
@@ -12,8 +14,8 @@ times = [minuteToTimestamp(t) for t in xrange( 2000 )]
 import csv
 
 trips = {}
-for row in csv.DictReader( open('trips.txt', 'rt') ):
-	trips[int(row['trip_id']) ] = int(row['route_id'])
+for row in c.execute('SELECT tripid, routeid FROM triptoroute'):
+	trips[ row[0] ] = row[1]
 
 parser = argparse.ArgumentParser(description="Draw pretty pictures of busses moving about")
 parser.add_argument("-r", "--route", type=int, action='append', help="Numbers of routes to show")
@@ -32,16 +34,18 @@ trips = dict( (k,v) for (k,v) in trips.items() if v in routes )
 
 stoptimes = defaultdict(list)
 valid_stops = set()
-for row in csv.DictReader( open('stop_times.txt', 'rt') ):
-	trip_id = int( row['trip_id'] )
+for row in c.execute("SELECT arrivaltime, tripid, stopid FROM stoptimes"):
+	trip_id = row[1]
 	if trip_id in trips:
-		stoptimes[row['arrival_time']].append( (row['stop_id'], int(row['trip_id']) ) )
-		valid_stops.add( row['stop_id'] )
+		stoptimes[row[0]].append( (row[2], trip_id) )
+		valid_stops.add( row[2] )
 
 stops = {}
-for row in csv.DictReader( open('stops.txt', 'rt') ):
-	if row['stop_id'] in valid_stops:
-		stops[row['stop_id'] ] = float(row['stop_lat']), float(row['stop_lon'])
+for row in c.execute("SELECT id, lat, long FROM stops"):
+	if row[0] in valid_stops:
+		stops[row[0] ] = row[1], row[2]
+print end - start
+
 
 min_lat = min( x[0] for x in stops.values() )
 max_lat = max( x[0] for x in stops.values() )
