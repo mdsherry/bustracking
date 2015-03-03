@@ -16,7 +16,7 @@ def parseVehicleInfo(s):
 	for row in data:
 		yield VehicleLoc( 
 			int( row['Trip']['Route']['RouteId']), 
-			int( row['Trip']['BlockId']),
+			int( row['TripId'] ),
 			row['Latitude'],
 			row['Longitude'],
 			int( row['Status'] ))
