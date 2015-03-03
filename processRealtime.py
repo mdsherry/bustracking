@@ -10,13 +10,10 @@ def retrieveVehicleInfo():
 	url = "http://realtimemap.grt.ca/Map/GetVehicles?unique={}&_=1425315125194"
 	f = urllib2.urlopen( url.format( time.time() ) )
 	return f.read()
-import pprint
-pp = pprint.PrettyPrinter()
 
 def parseVehicleInfo(s):
 	data = json.loads( s )
 	for row in data:
-		pp.pprint( row )
 		yield VehicleLoc( 
 			int( row['Trip']['Route']['RouteId']), 
 			int( row['Trip']['BlockId']),
@@ -24,8 +21,19 @@ def parseVehicleInfo(s):
 			row['Longitude'],
 			int( row['Status'] ))
 
+def main():
+	import sqlite3
+	conn = sqlite3.connect('busdata.db')
+	c = conn.cursor()
+	c.execute("CREATE TABLE IF NOT EXISTS rtentries (time, routeid, tripid, lat, long, status)")
+	
+	vehicles = parseVehicleInfo( retrieveVehicleInfo() )
+	curtime = int(time.time())
+	c.executemany("INSERT INTO rtentries VALUES (?, ?, ?, ?, ?, ?)", [ (curtime,) + vehicle for vehicle in vehicles] )
+	conn.commit()
 
 if __name__ == "__main__":
-	f = open('realtimetest.json','rt')
-	for vehicle in parseVehicleInfo( f.read() ):
-		print vehicle
+	# f = open('realtimetest.json','rt')
+	# for vehicle in parseVehicleInfo( f.read() ):
+	# 	print vehicle
+	main()
