@@ -7,10 +7,10 @@ conn = sqlite3.connect('busdata.db')
 c = conn.cursor()
 
 def minuteToTimestamp(t):
-	return "{0:02d}:{1:02d}:00".format( 5 + (t/60), t % 60)
+	return "{0:02d}:{1:02d}:00".format( (t/60), t % 60)
 
 
-times = [minuteToTimestamp(t) for t in xrange( 2000 )]
+times = [minuteToTimestamp(t) for t in xrange( 27 * 60 )]
 import csv
 
 trips = {}
@@ -98,16 +98,37 @@ blackSurface = pygame.image.load('map.png')
 time = 0
 tick = 0
 speed = 30
+freq = 2
+auto = True
 while True:
 	rttimestamps = []
 	lastpos = {}
 
 	for row in c.execute("SELECT DISTINCT time FROM rtentries"):
 		rttimestamps.append( row[0] )
+	rtidx = 0
+	while True:
+		if auto:
+			tick += 1
+			if tick >= freq:
+				print time
+				print datetime.fromtimestamp( rttimestamp )
+				tick = 0
+				rtidx += 1
+				if rtidx >= len( rttimestamps ):
+					rtidx = 0
 
-	for rttimestamp in rttimestamps:
+		rttimestamp = rttimestamps[rtidx]
 		t = datetime.fromtimestamp( rttimestamp )
-		time = t.minute + (t.hour-5) * 60
+		time = t.minute + (t.hour) * 60
+		if t.hour < 3:
+			time += 24 * 60
+		if time < 0:
+			print "*",time
+			print datetime.fromtimestamp( rttimestamp )
+			time += 19*60
+			print time
+		lastpos = {}
 		timestamp = times[time]
 		if args.renderStops:
 			if timestamp in stoptimes:
@@ -116,6 +137,7 @@ while True:
 					if route in routes:
 						x,y = geomToPixel( *stops[stop] )
 						lastpos[trip_id] = x,y
+		
 		for bus in c.execute("SELECT tripid, routeid, lat, long FROM rtentries WHERE time = ?", (rttimestamp,) ):
 			trip_id, route, lat, lon = bus
 			if route not in routes:
@@ -141,11 +163,8 @@ while True:
 
 				pygame.draw.line( windowSurfaceObj, routeCol, (x,y), (realx, realy) )						
 
-		tick += 1
-		if tick == 1:
-			# time += 1
-			tick = 0
-			pygame.transform.average_surfaces( ( windowSurfaceObj, windowSurfaceObj, windowSurfaceObj, blackSurface), windowSurfaceObj)
+		
+		pygame.transform.average_surfaces( ( windowSurfaceObj, windowSurfaceObj, windowSurfaceObj, blackSurface), windowSurfaceObj)
 			
 		for event in pygame.event.get():
 			if event.type == QUIT:
@@ -158,11 +177,19 @@ while True:
 					args.renderStops = not args.renderStops
 					lastpos = {}
 				elif event.key == K_PLUS or event.key == K_EQUALS:
-					speed += 5
+					if auto:
+						freq += 1
+					else:
+						rtidx += 1
 				elif event.key == K_MINUS:
-					speed -= 5
-					if speed < 5:
-						speed = 5
+					if auto:
+						freq -= 1
+						if freq < 1:
+							freq = 1
+					else:
+						rtidx -= 1
+				elif event.key == K_a:
+					auto = not auto
 		pygame.display.update()
 		#pygame.image.save( windowSurfaceObj, "{0:05d}.png".format( time ))
-		fpsClock.tick(speed)
+		fpsClock.tick(30)
